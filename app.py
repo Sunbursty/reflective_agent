@@ -1,7 +1,12 @@
+import json
 import os
+import uuid
+from datetime import datetime
 
+import gspread
 import streamlit as st
 from dotenv import load_dotenv
+from google.oauth2.service_account import Credentials
 from openai import OpenAI
 
 load_dotenv()  # local dev: reads from .env file; no-op on Streamlit Cloud
@@ -74,6 +79,39 @@ def get_client():
         api_key = None
     api_key = api_key or os.getenv("XIAOHUMINI_API_KEY") or ""
     return OpenAI(base_url="https://xiaohumini.site/v1", api_key=api_key)
+
+
+SHEET_ID = "19AFskBHYn5WpDE0kwB96ntNb-2jdBEgEKTDW08GXG5I"
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+
+def log_to_sheet(career_interest, reflection_style, personality, lang, messages, summary):
+    try:
+        try:
+            creds_dict = dict(st.secrets["gcp_service_account"])
+        except Exception:
+            creds_json = os.getenv("GCP_SERVICE_ACCOUNT_JSON", "{}")
+            creds_dict = json.loads(creds_json)
+
+        creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        gc = gspread.authorize(creds)
+        sheet = gc.open_by_key(SHEET_ID).sheet1
+
+        conversation = "\n".join(
+            f"[{m['role'].upper()}] {m['content']}" for m in messages
+        )
+        sheet.append_row([
+            datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            st.session_state.get("session_id", ""),
+            career_interest,
+            reflection_style,
+            personality,
+            lang,
+            conversation,
+            summary,
+        ])
+    except Exception as e:
+        st.warning(f"记录失败（不影响使用）：{e}")
 
 
 def build_system_prompt(career_interest: str, reflection_style: str, personality: str, lang: str = "en") -> str:
@@ -243,6 +281,7 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": T["initial_message"]}
     ]
     st.session_state._last_lang = lang
+    st.session_state.session_id = str(uuid.uuid4())[:8]
 
 if st.session_state.get("_last_lang") != lang:
     if len(st.session_state.messages) == 1:
@@ -304,6 +343,11 @@ if st.button(T["summary_btn"], key="summary_btn"):
             temperature=0.5,
         )
         st.session_state.summary_text = response.choices[0].message.content
+        log_to_sheet(
+            career_interest, reflection_style, personality, lang,
+            st.session_state.messages,
+            st.session_state.summary_text,
+        )
     except Exception as e:
         st.error(T["error_summary"].format(e))
 
