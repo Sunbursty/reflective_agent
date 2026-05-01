@@ -1,15 +1,12 @@
-print("=== THIS MAIN.PY IS LOADED ===")
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
-import traceback
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
-print("XIAOHUMINI KEY EXISTS:", bool(os.getenv("XIAOHUMINI_API_KEY")))
+
 app = FastAPI(title="Career Reflection Agent API")
 
 app.add_middleware(
@@ -25,6 +22,7 @@ app.add_middleware(
 # )
 
 # MODEL_NAME = "meta-llama/llama-3.1-8b-instruct"
+
 client = OpenAI(
     base_url="https://xiaohumini.site/v1",
     api_key=os.getenv("XIAOHUMINI_API_KEY"),
@@ -145,33 +143,45 @@ Based on the conversation, generate an insightful Career Reflection Summary.
 Your goal is NOT to simply repeat what the user said — it is to surface patterns,
 tensions, and implications that the user may not have explicitly articulated.
 
-Structure your summary as follows:
+The conversation followed a structured reflection framework with six stages:
+Stage 1 — Meaningful Experience: What experience felt significant to the user?
+Stage 2 — Specific Actions: What did they concretely do in that experience?
+Stage 3 — Transferable Skills: What skills did those actions demonstrate?
+Stage 4 — Motivation: What drives them (autonomy, competence, relatedness)?
+Stage 5 — Strengths & Weaknesses: What do they do well, and where do they struggle?
+Stage 6 — Career Direction: What career paths align with their profile?
 
-1. Core Identity Thread
+Structure your summary to reflect this framework:
+
+1. Reflection Journey Overview
+   Briefly trace how the conversation unfolded across the six stages.
+   Note which stages produced rich insights and which felt underdeveloped.
+
+2. Core Identity Thread
    Identify the underlying theme that connects the user's experiences, skills, and motivations.
    What does this pattern reveal about who they are as a professional?
 
-2. Key Transferable Skills (with evidence)
+3. Key Transferable Skills (with evidence)
    List 3–5 skills, each tied to a specific moment or example from the conversation.
    Avoid generic labels — describe how the skill manifested.
 
-3. Motivation Analysis
+4. Motivation Analysis
    - What drives them intrinsically (autonomy, mastery, purpose)?
    - Are there any tensions between what they enjoy and what they think they "should" pursue?
 
-4. Hidden Strengths & Blind Spots
+5. Hidden Strengths & Blind Spots
    - What strengths did the user downplay or not fully recognize?
    - What recurring challenges or avoidance patterns emerged?
 
-5. Career Direction Fit (ranked)
+6. Career Direction Fit (ranked)
    Suggest 2–3 specific career directions that align with their profile.
    For each: explain WHY it fits based on their specific answers, and what the tradeoff is.
 
-6. Concrete Next Steps (personalized)
+7. Concrete Next Steps (personalized)
    Give 3 specific, actionable steps the user can take in the next 1–4 weeks.
    Ground each step in something they actually said — no generic advice.
 
-7. One Reframe
+8. One Reframe
    Offer one perspective shift — something the user might be underestimating about themselves
    or a limiting belief that came through in the conversation.
 
@@ -181,7 +191,6 @@ Be direct, specific, and insightful. Prioritize depth over completeness.
 
 @app.post("/chat")
 def chat(req: ChatRequest):
-    print("=== CHAT ENDPOINT CALLED ===")
     try:
         system_msg = {"role": "system", "content": build_system_prompt(
             req.career_interest, req.reflection_style, req.personality, req.lang
@@ -194,7 +203,6 @@ def chat(req: ChatRequest):
         )
         return {"reply": response.choices[0].message.content}
     except Exception as e:
-        print("SUMMARY ERROR:", repr(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -216,7 +224,6 @@ def summary(req: SummaryRequest):
         )
         return {"summary": response.choices[0].message.content}
     except Exception as e:
-        print("SUMMARY ERROR:", repr(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
